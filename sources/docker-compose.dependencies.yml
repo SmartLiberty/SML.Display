@@ -1,0 +1,17 @@
+version: "3.9"
+
+# bare minimum to perform integration tests
+services:
+  postgres:
+    container_name: postgres.tests
+    environment:
+      POSTGRES_PASSWORD: postgresPWD
+    image: postgres
+    ports:
+      - "5432:5432"
+
+  rabbitmq:
+    container_name: rabbitmq.tests
+    image: rabbitmq:3.8.10-management-alpine
+    ports:
+      - 5672:5672

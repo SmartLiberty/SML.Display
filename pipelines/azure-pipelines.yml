@@ -1,0 +1,863 @@
+trigger:
+  branches:
+    include:
+      - main
+      - qa
+      - develop
+  batch: true
+pr:
+  autoCancel: true
+
+variables:
+  # Key Vault
+  - group: key-vault-group
+  # Workflow branching strategies
+  - name: needToRelease
+    value: $[or(eq(variables['Build.SourceBranch'], 'refs/heads/main'),
+      eq(variables['Build.SourceBranch'], 'refs/heads/develop'),
+      eq(variables['Build.SourceBranch'], 'refs/heads/qa'))]
+  - name: isADockerLatestImage
+    value: $[eq(variables['Build.SourceBranch'], 'refs/heads/main')]
+  # General
+  - name: System.Debug
+    value: false
+  # Versions & Plateforms
+  - name: vmImageUbuntu
+    value: ubuntu-22.04
+  - name: dotnet-sdk-docker-image-tag
+    value: 8.0
+  - name: dotnet-aspnet-docker-image-tag
+    value: 8.0
+  #    - name: camouflage-version
+  #      value: 0.8.2
+  # Artefact repository
+  - name: feedName
+    value: SmartDevOps/SmartNuget
+  # Container registry
+  - name: container-registry-ci
+    value: smlacrci
+  - name: container-registry-ci-full-name
+    value: smlacrci.azurecr.io
+  - name: container-registry
+    value: smlpoc-cr
+  - name: container-registry-full-name
+    value: smlpoc.azurecr.io
+  # directories
+  - name: powershell-directory
+    value: $(Build.SourcesDirectory)/scripts/ci-cd/powershell
+  - name: powershell-directory-sml-service
+    value: $(Build.SourcesDirectory)/SML.ExampleGrpc/scripts/ci-cd/powershell
+  - name: sln-directory
+    value: $(Build.SourcesDirectory)/SML.ExampleGrpc/sources
+  - name: project-directory
+    value: $(sln-directory)/$(project-name)
+  - name : service-deploy-directory
+    value: $(Build.SourcesDirectory)/SML.ExampleGrpc/scripts
+  # Dotnet Life Cycle
+  - name: dotnetcore
+    value: 8.0.x
+  - name: build-configuration
+    value: Release
+  - name: project-name
+    value: SML.ExampleGrpc
+  - name: packageName
+    value: $(project-name)-$(Build.BuildNumber)
+  - name: artifactBaseName
+    value: $(project-name)
+  - name: ProjectIntegrationTestName
+    value: $(project-name).Tests.Integration
+  - name: ProjectSystemTestName
+    value: $(project-name).Tests.System
+    # Linux runtime
+  - name: linuxRuntime
+    value: linux-x64
+    # Windows artefacts sufix
+  - name: windowsRuntime
+    value: win-x64
+  #  # Camouflage Mock Projects
+  #    - name : IntegrationTestsMockServer
+  #      value: $(ProjectIntegrationTestName).Mock.Server
+  #    - name : SystemTestsMockServer
+  #      value : $(ProjectSystemTestName).Mock.Server
+  #    - name : camouflage-project-integration-tests-artefact-name
+  #      value: camouflage-project-integration-tests
+  #    - name: camouflage-project-system-tests-artefact-name
+  #      value: camouflage-project-system-tests
+  # Docker Life Cycle
+  - name: dockerCiBuildPath
+    value: $(Build.SourcesDirectory)/docker/ci-docker-build
+  - name: imageRepository
+    value: sml-examplegrpc
+  #    - name: imageRepositoryTestsSystem
+  #      value: $(imageRepository)-tests-system
+  #    - name: imageRepositoryTestsIntegration
+  #      value: $(imageRepository)-tests-integration
+  #    - name: imageRepositoryTestsSystemMockServer
+  #      value: $(imageRepository)-tests-system-mock-server
+  #    - name: imageRepositoryTestsIntegrationMockServer
+  #      value: $(imageRepository)-tests-integration-mock-server
+  #  # Tests Life Cycle
+  #    - name: dockerCiTestsIntegrationPath
+  #      value: $(Build.SourcesDirectory)/docker/ci-tests/integration
+  #    - name: dockerCiTestsSystemPath
+  #      value: $(Build.SourcesDirectory)/docker/ci-tests/system
+  #    - name: outputTestsDockerizedStage
+  #      value: $(Build.ArtifactStagingDirectory)/output
+  #    - name: testResultsDirectory
+  #      value: $(Build.ArtifactStagingDirectory)/testResults
+  #    - name: logTime
+  #      value: 000000
+  # Release stages
+  # # # #SharePoint variables
+  # Feed releases
+  - name: feed-package-name
+    value: sml-examplegrpc
+
+resources:
+  repositories:
+    - repository: SML.ExampleGrpc
+      type: github
+      name: SmartLiberty/SML.ExampleGrpc
+      endpoint: SmartDevOps
+      ref: $(Build.SourceBranch)
+    - repository: Tool.DeploymentModule
+      type: github
+      name: SmartLiberty/Tool.DeploymentModule
+      endpoint: SmartDevOps
+      ref: main
+
+# Stage : set version
+# # # # # # # # # # #
+stages:
+- stage: set_version
+  dependsOn:
+  displayName: Set version
+  jobs:
+  - job:
+    pool:
+      vmImage: $(vmImageUbuntu)
+    displayName: set version
+    steps:
+    - task: PowerShell@2
+      displayName: retreave version
+      inputs:
+        filePath: ./scripts/ci-cd/powershell/retrieveProjectVersion.ps1
+        arguments: -FilePath ./sources/$(project-name)/$(project-name).csproj
+    - script: echo "##vso[build.updatebuildnumber]$(version)"
+      displayName: Pipeline Version
+    - task: PowerShell@2
+      displayName: "Check version against branch"
+      condition: and(eq(variables.needToRelease, 'true'), succeeded())
+      inputs:
+        filePath: $(powershell-directory)/check-branching-versioning.ps1
+        arguments: -Version $(version) -Branch $(Build.SourceBranch)
+    # Check if UPack exist in Alpha Feed
+    - task: PowerShell@2
+      displayName: Check if UPack exist in Alpha Feed
+      condition: and(eq(variables.needToRelease, 'true'), succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/develop'))
+      inputs:
+        filePath: $(powershell-directory)/feed-check-package-version-if-exist.ps1
+        arguments: -FeedName Alpha -PackageName $(feed-package-name)-$(windowsRuntime) -PackageVersion $(Build.BuildNumber) -PAT $(pat-api-azure)
+    # Check if UPack exist in Beta Feed
+    - task: PowerShell@2
+      displayName: Check if UPack exist in Beta Feed
+      condition: and(eq(variables.needToRelease, 'true'), succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/qa'))
+      inputs:
+        filePath: $(powershell-directory)/feed-check-package-version-if-exist.ps1
+        arguments: -FeedName Beta -PackageName $(feed-package-name)-$(windowsRuntime) -PackageVersion $(Build.BuildNumber) -PAT $(pat-api-azure)
+    # Check if UPack exist in Beta Feed
+    - task: PowerShell@2
+      displayName: Check if UPack exist in Rc-Prod Feed
+      condition: and(eq(variables.needToRelease, 'true'), succeeded(), or(eq(variables['Build.SourceBranch'], 'refs/heads/main'),eq(variables['Build.SourceBranch'], 'refs/heads/rc')))
+      inputs:
+        filePath: $(powershell-directory)/feed-check-package-version-if-exist.ps1
+        arguments: -FeedName RC-Prod -PackageName $(feed-package-name)-$(windowsRuntime) -PackageVersion $(Build.BuildNumber) -PAT $(pat-api-azure)
+
+# Stage : Linux .Net Life Cycle
+# # # # # # # # # # # # # # # #
+- stage: linux_dotnet_lifecycle
+  displayName: Linux dotnet life cycle
+  dependsOn: set_version
+  jobs:
+    - job:
+      displayName: ubuntu x64 .Net6 LifeCycle
+      pool:
+        vmImage: $(vmImageubuntu)
+      # Steps : .Net Life Cycle
+      #########################
+      steps:
+      - checkout: SML.ExampleGrpc
+      - task: UseDotNet@2
+        displayName: Dotnet Install .NET Core sdk $(dotnetcore)
+        inputs:
+          version: $(dotnetcore)
+      # Restore sln
+      - task: DotNetCoreCLI@2
+        displayName: Restore
+        inputs:
+          command: restore
+          projects: $(sln-directory)/*.sln
+          feedsToUse: select
+          vstsFeed: $(feedName)
+          includeNuGetOrg: true
+      ## Build all csproj
+      - task: DotNetCoreCLI@2
+        displayName: Build
+        inputs:
+          command: build
+          arguments: --configuration $(build-configuration) --no-restore
+          projects: $(sln-directory)/**/*.csproj
+      # Collect code coverage metrics with Coverlet
+      # All Unit Tests csproj
+      - task: DotNetCoreCLI@2
+        displayName: "dotnet test"
+        inputs:
+          command: test
+          arguments: '--configuration $(buildConfiguration) --collect:"XPlat Code Coverage" -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura'
+          publishTestResults: true
+          projects: $(sln-directory)/**/*.Tests.Unit.csproj # update with your test project directory
+      # Publish all unit tests resutls and code coveradge
+      - task: PublishCodeCoverageResults@2
+        displayName: "Publish code coverage report"
+        inputs:
+          codeCoverageTool: "Cobertura"
+          summaryFileLocation: "$(Agent.TempDirectory)/**/coverage.cobertura.xml"
+      # Linux runtime
+      # Publish project linux runtime
+      - task: DotNetCoreCLI@2
+        displayName: Publish $(artifactBaseName)-$(linuxRuntime)
+        inputs:
+          projects: $(project-directory)/$(project-name).csproj
+          command: publish
+          arguments: -c $(build-configuration) -o  $(Build.ArtifactStagingDirectory)/$(artifactBaseName)-$(linuxRuntime) -r linux-x64 --self-contained false
+          zipAfterPublish: true
+          modifyOutputPath: false
+      # Publish pipeline linux runtime artefact
+      - task: PublishPipelineArtifact@1
+        displayName: Publish pipeline artefact $(artifactBaseName)-$(linuxRuntime)
+        inputs:
+          targetPath: $(Build.ArtifactStagingDirectory)/$(artifactBaseName)-$(linuxRuntime)/$(artifactBaseName)-$(linuxRuntime).zip
+          artifactName: $(artifactBaseName)-$(linuxRuntime)
+      # Windows runtime
+      # Publish project windows runtime
+      - task: DotNetCoreCLI@2
+        displayName: Publish $(artifactBaseName)-$(windowsRuntime)
+        inputs:
+          projects: $(project-directory)/$(project-name).csproj
+          command: publish
+          arguments: -c $(build-configuration) -o  $(Build.ArtifactStagingDirectory)/$(artifactBaseName)-$(windowsRuntime)/$(project-name) -r win-x64 --self-contained false
+          zipAfterPublish: false
+          modifyOutputPath: false
+      # Copy scripts
+      - task: CopyFiles@2
+        displayName: Copy scripts
+        inputs:
+          SourceFolder: $(service-deploy-directory)/deploy
+          TargetFolder: $(Build.ArtifactStagingDirectory)/$(artifactBaseName)-$(windowsRuntime)
+          Contents: '*.ps1'
+      # Fetch deployment module
+      - checkout: Tool.DeploymentModule
+      - task: CopyFiles@2
+        inputs:
+          SourceFolder: $(Build.SourcesDirectory)/Tool.DeploymentModule
+          TargetFolder: $(Build.ArtifactStagingDirectory)/$(artifactBaseName)-$(windowsRuntime)
+          Contents: 'DeploymentModule.psm1'
+        displayName: "Get file from Tool.DeploymentModule"
+      - checkout: SML.ExampleGrpc
+      # Archive all
+      - task: ArchiveFiles@2
+        inputs:
+          rootFolderOrFile: $(Build.ArtifactStagingDirectory)/$(artifactBaseName)-$(windowsRuntime)
+          includeRootFolder: false
+          archiveType: zip
+          archiveFile: $(Build.ArtifactStagingDirectory)/$(artifactBaseName)-$(windowsRuntime).zip
+          replaceExistingArchive: true
+          verbose: true
+      # Publish pipeline windows runtime artefact
+      - task: PublishPipelineArtifact@1
+        displayName: Publish pipeline artefact $(artifactBaseName)-$(windowsRuntime)
+        inputs:
+          targetPath: $(Build.ArtifactStagingDirectory)/$(artifactBaseName)-$(windowsRuntime).zip
+          artifactName: $(artifactBaseName)-$(windowsRuntime)
+      # Publish integration tests
+      - task: DotNetCoreCLI@2
+        displayName: Dotnet publish artifact $(ProjectIntegrationTestName)
+        inputs:
+          projects: $(sln-directory)/$(ProjectIntegrationTestName)/*.csproj
+          command: publish
+          arguments: -c $(build-configuration) -o  $(Build.ArtifactStagingDirectory)/$(ProjectIntegrationTestName)
+          zipAfterPublish: true
+          modifyOutputPath: false
+          publishWebProjects: false
+      # Publish pipeline integration artefact
+      - task: PublishPipelineArtifact@1
+        displayName: Publish pipeline artefact $(ProjectIntegrationTestName)
+        inputs:
+          targetPath: $(Build.ArtifactStagingDirectory)/$(ProjectIntegrationTestName)/$(ProjectIntegrationTestName).zip
+          artifactName: $(ProjectIntegrationTestName)
+    # Publish system tests
+      - task: DotNetCoreCLI@2
+        displayName: Dotnet publish artifact $(ProjectSystemTestName)
+        inputs:
+          projects: $(sln-directory)/$(ProjectSystemTestName)/*.csproj
+          command: publish
+          arguments: -c $(build-configuration) -o  $(Build.ArtifactStagingDirectory)/$(ProjectSystemTestName)
+          zipAfterPublish: true
+          modifyOutputPath: false
+          publishWebProjects: false
+      # Publish pipeline project artefact
+      - task: PublishPipelineArtifact@1
+        displayName: Publish pipeline artefact $(ProjectSystemTestName)
+        inputs:
+          targetPath: $(Build.ArtifactStagingDirectory)/$(ProjectSystemTestName)/$(ProjectSystemTestName).zip
+          artifactName: $(ProjectSystemTestName)
+      # Prepare camouflage project mock server system tests
+      - task: PowerShell@2
+        displayName:  Prepare camouflage project mock server system tests
+        inputs:
+          filePath: $(powershell-directory-sml-service)/copy-proto-from-package-references-in-csproj.ps1
+          arguments: -csprojFilePath "$(sln-directory)/$(ProjectSystemTestName)/$(ProjectSystemTestName).csproj" -nuGetPackageRoot "~/.nuget/packages/" -destinationPath "$(sln-directory)/$(ProjectSystemTestName)/camouflage.mock.server/camouflage/grpc/protos"
+      # Archives camouflage project mock server system tests
+      - task: ArchiveFiles@2
+        displayName: Archive camouflage project mock server system tests
+        inputs:
+          rootFolderOrFile: $(sln-directory)/$(ProjectSystemTestName)/camouflage.mock.server/camouflage
+          archiveType: zip
+          includeRootFolder: false
+          archiveFile: $(Build.ArtifactStagingDirectory)/$(camouflage-project-system-tests-artefact-name).zip
+      # publish camouflage project mock server system tests
+      - task: PublishPipelineArtifact@1
+        displayName: Publish pipeline artefact camouflage system mock server
+        inputs:
+          targetPath: $(Build.ArtifactStagingDirectory)/$(camouflage-project-system-tests-artefact-name).zip
+          artifactName: $(camouflage-project-system-tests-artefact-name)
+      
+  # Stage : Linux Docker build Life Cycle
+  # # # # # # # # # # # # # # # # # # #
+
+- stage: linux_docker_build_lifecycles
+  displayName: Linux Docker build Life Cycle
+  dependsOn: [linux_dotnet_lifecycle]
+  jobs:
+    # Job : Docker build lifecycle
+    ##############################
+    - job:
+      displayName: Linux Docker build project
+      pool:
+        vmImage: $(vmImageUbuntu)
+      steps:
+        # Download artifact
+        - task: DownloadPipelineArtifact@2
+          displayName: Download $(artifactBaseName)-$(linuxRuntime)
+          inputs:
+            artifact: $(artifactBaseName)-$(linuxRuntime)
+            path: $(dockerCiBuildPath)/$(project-name)/app
+        # Extract artifact file
+        - task: ExtractFiles@1
+          displayName: Extract artifact $(artifactBaseName)-$(linuxRuntime)
+          inputs:
+            archiveFilePatterns: $(dockerCiBuildPath)/$(project-name)/app/*.zip
+            destinationFolder: $(dockerCiBuildPath)/$(project-name)/app
+            cleanDestinationFolder: false
+            overwriteExistingFiles: false
+        # Delete archive
+        - task: DeleteFiles@1
+          displayName: Delete artifact file $(artifactBaseName)-$(linuxRuntime)
+          inputs:
+            Contents: $(dockerCiBuildPath)/$(project-name)/app/*.zip
+        - task: Docker@2
+          displayName: Docker build
+          inputs:
+            containerRegistry: $(container-registry-ci)
+            repository: $(imageRepository)
+            command: "build"
+            Dockerfile: $(dockerCiBuildPath)/$(project-name)/Dockerfile
+            buildContext: $(dockerCiBuildPath)/$(project-name)
+            arguments: --build-arg IMAGE_REGISTRY=$(container-registry-ci-full-name) --build-arg IMAGE_DOTNET_SDK_TAG=$(dotnet-sdk-docker-image-tag) --build-arg IMAGE_DOTNET_ASPNET_TAG=$(dotnet-aspnet-docker-image-tag)
+            tags: |
+              tests-$(Build.BuildNumber)-id-$(Build.BuildId)
+        # Docker build push image
+        - task: Docker@2
+          displayName: Docker push
+          inputs:
+            containerRegistry: $(container-registry-ci)
+            repository: $(imageRepository)
+            command: "push"
+            tags: |
+              tests-$(Build.BuildNumber)-id-$(Build.BuildId)
+  #    # Job : Docker build lifecycle Integration Tests
+  #    ################################################
+  #    - job:
+  #      displayName : Linux Docker build integration tests
+  #      pool:
+  #        vmImage: $(vmImageUbuntu)
+  #      steps:
+  #      # Download artifact
+  #      - task: DownloadPipelineArtifact@2
+  #        displayName: Download $(ProjectIntegrationTestName)
+  #        inputs:
+  #          artifact: $(ProjectIntegrationTestName)
+  #          path:  $(dockerCiBuildPath)/$(ProjectIntegrationTestName)/app
+  #      # Extract artifact file
+  #      - task: ExtractFiles@1
+  #        displayName: Extract artifact $(ProjectIntegrationTestName)
+  #        inputs:
+  #          archiveFilePatterns: $(dockerCiBuildPath)/$(ProjectIntegrationTestName)/app/*.zip
+  #          destinationFolder: $(dockerCiBuildPath)/$(ProjectIntegrationTestName)/app
+  #          cleanDestinationFolder: false
+  #          overwriteExistingFiles: false
+  #      # Delete archive
+  #      - task: DeleteFiles@1
+  #        displayName: Delete artifact file $(ProjectIntegrationTestName)
+  #        inputs:
+  #          Contents: $(dockerCiBuildPath)/$(ProjectIntegrationTestName)/app/*.zip
+  #      - task: Docker@2
+  #        displayName: Docker build and push
+  #        inputs:
+  #          containerRegistry: $(container-registry-ci)
+  #          repository: $(imageRepositoryTestsIntegration)
+  #          command: 'buildAndPush'
+  #          Dockerfile: $(dockerCiBuildPath)/$(ProjectIntegrationTestName)/Dockerfile
+  #          tags: |
+  #            tests-$(Build.BuildNumber)-id-$(Build.BuildId)
+  #    # Job : Docker build lifecycle System Tests
+  #    ###########################################
+  #    - job:
+  #      displayName : Linux Docker build system tests
+  #      pool:
+  #        vmImage: $(vmImageUbuntu)
+  #      steps:
+  #      # Download artifact
+  #      - task: DownloadPipelineArtifact@2
+  #        displayName: Download $(ProjectSystemTestName)
+  #        inputs:
+  #          artifact: $(ProjectSystemTestName)
+  #          path:  $(dockerCiBuildPath)/$(ProjectSystemTestName)/app
+  #      # Extract artifact file
+  #      - task: ExtractFiles@1
+  #        displayName: Extract artifact $(ProjectSystemTestName)
+  #        inputs:
+  #          archiveFilePatterns: $(dockerCiBuildPath)/$(ProjectSystemTestName)/app/*.zip
+  #          destinationFolder: $(dockerCiBuildPath)/$(ProjectSystemTestName)/app
+  #          cleanDestinationFolder: false
+  #          overwriteExistingFiles: false
+  #      # Delete archive
+  #      - task: DeleteFiles@1
+  #        displayName: Delete artifact file $(ProjectSystemTestName)
+  #        inputs:
+  #          Contents: $(dockerCiBuildPath)/$(ProjectSystemTestName)/app/*.zip
+  #      # Docker build image
+  #      - task: Docker@2
+  #        displayName: Docker build and push
+  #        inputs:
+  #          containerRegistry: $(container-registry-ci)
+  #          repository: $(imageRepositoryTestsSystem)
+  #          command: 'buildAndPush'
+  #          Dockerfile: $(dockerCiBuildPath)/$(ProjectSystemTestName)/Dockerfile
+  #          tags: |
+  #            tests-$(Build.BuildNumber)-id-$(Build.BuildId)
+  #    # Job : Docker build lifecycle Mock Server Integration Tests
+  #    ############################################################
+  #    - job:
+  #      displayName : Linux Docker build integration tests mock server
+  #      pool:
+  #        vmImage: $(vmImageUbuntu)
+  #      steps:
+  #      # Download artifact
+  #      - task: DownloadPipelineArtifact@2
+  #        displayName: Download $(camouflage-project-integration-tests-artefact-name)
+  #        inputs:
+  #          artifact: $(camouflage-project-integration-tests-artefact-name)
+  #          path:  $(dockerCiBuildPath)/$(IntegrationTestsMockServer)/camouflage
+  #      # Extract artifact file
+  #      - task: ExtractFiles@1
+  #        displayName: Extract artifact $(camouflage-project-integration-tests-artefact-name)
+  #        inputs:
+  #          archiveFilePatterns:  $(dockerCiBuildPath)/$(IntegrationTestsMockServer)/camouflage/*.zip
+  #          destinationFolder:  $(dockerCiBuildPath)/$(IntegrationTestsMockServer)/camouflage
+  #          cleanDestinationFolder: false
+  #          overwriteExistingFiles: false
+  #      # Delete archive
+  #      - task: DeleteFiles@1
+  #        displayName: Delete artifact file $(camouflage-project-integration-tests-artefact-name)
+  #        inputs:
+  #          Contents: $(dockerCiBuildPath)/$(IntegrationTestsMockServer)/camouflage/*.zip
+  #      # Build
+  #      - task: Docker@2
+  #        displayName: Build
+  #        inputs:
+  #          containerRegistry: $(container-registry-ci)
+  #          repository: $(imageRepositoryTestsIntegrationMockServer)
+  #          command: build
+  #          Dockerfile: $(dockerCiBuildPath)/$(IntegrationTestsMockServer)/Dockerfile
+  #          tags: tests-$(Build.BuildNumber)-id-$(Build.BuildId)
+  #          arguments: --build-arg CAMOUFLAGE_VERSION=$(camouflage-version)
+  #      # Push
+  #      - task: Docker@2
+  #        displayName: Push
+  #        inputs:
+  #          containerRegistry: $(container-registry-ci)
+  #          repository: $(imageRepositoryTestsIntegrationMockServer)
+  #          command: push
+  #          tags: tests-$(Build.BuildNumber)-id-$(Build.BuildId)
+  #    # Job : Docker build lifecycle Mock Server System Tests
+  #    #######################################################
+  #    - job:
+  #      displayName : Linux Docker build system tests mock server
+  #      pool:
+  #        vmImage: $(vmImageUbuntu)
+  #      steps:
+  #      # Download artifact
+  #      - task: DownloadPipelineArtifact@2
+  #        displayName: Download $(camouflage-project-system-tests-artefact-name)
+  #        inputs:
+  #          artifact: $(camouflage-project-system-tests-artefact-name)
+  #          path:  $(dockerCiBuildPath)/$(SystemTestsMockServer)/camouflage
+  #      # Extract artifact file
+  #      - task: ExtractFiles@1
+  #        displayName: Extract artifact $(camouflage-project-system-tests-artefact-name)
+  #        inputs:
+  #          archiveFilePatterns:  $(dockerCiBuildPath)/$(SystemTestsMockServer)/camouflage/*.zip
+  #          destinationFolder:  $(dockerCiBuildPath)/$(SystemTestsMockServer)/camouflage
+  #          cleanDestinationFolder: false
+  #          overwriteExistingFiles: false
+  #      # Delete archive
+  #      - task: DeleteFiles@1
+  #        displayName: Delete artifact file $(camouflage-project-system-tests-artefact-name)
+  #        inputs:
+  #          Contents: $(dockerCiBuildPath)/$(SystemTestsMockServer)/camouflage/*.zip
+  #      # Build
+  #      - task: Docker@2
+  #        displayName: Build
+  #        inputs:
+  #          containerRegistry: $(container-registry-ci)
+  #          repository: $(imageRepositoryTestsSystemMockServer)
+  #          command: build
+  #          Dockerfile: $(dockerCiBuildPath)/$(SystemTestsMockServer)/Dockerfile
+  #          tags: tests-$(Build.BuildNumber)-id-$(Build.BuildId)
+  #          arguments: --build-arg CAMOUFLAGE_VERSION=$(camouflage-version)
+  #      # Push
+  #      - task: Docker@2
+  #        displayName: Push
+  #        inputs:
+  #          containerRegistry: $(container-registry-ci)
+  #          repository: $(imageRepositoryTestsSystemMockServer)
+  #          command: push
+  #          tags: tests-$(Build.BuildNumber)-id-$(Build.BuildId)
+  #
+  ## Stage : docker-commpose tests integration lifecycle
+  ## # # # # # # # # # # # # # # # # # # # # # # # # # #
+  #- stage: tests_integration
+  #  displayName: Tests integration
+  #  dependsOn: [ linux_docker_build_lifecycles]
+  #  jobs:
+  #    - job:
+  #      displayName : Integration tests
+  #      pool:
+  #          vmImage: $(vmImageubuntu)
+  #      # Tests : Tests Integration
+  #      ###########################
+  #      steps:
+  #      - pwsh : echo echo "##vso[task.setvariable variable=logTime]$(date +"%H%M%S")"
+  #        displayName: setLogTime
+  #      # Install latest Docker Compose
+  #      - pwsh: |
+  #          sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+  #          sudo chmod +x /usr/local/bin/docker-compose
+  #          docker-compose --version
+  #        displayName: 'Install latest Docker Compose'
+  #      # docker login
+  #      - task: Docker@2
+  #        inputs:
+  #          containerRegistry: $(container-registry-ci)
+  #          command: 'login'
+  #      # Run retreave azure certificate from key vault
+  #      - task: AzureCLI@2
+  #        displayName: "Install Certificate"
+  #        inputs:
+  #          azureSubscription: 'Azure-DevOps'
+  #          scriptType: 'pscore'
+  #          scriptLocation: 'inlineScript'
+  #          addSpnToEnvironment: true
+  #          inlineScript: |
+  #            Set-PSDebug -Trace 1
+  #            $vaultName="SML-DEV-KeyVault"
+  #            $certName="systemTestsAutosignedTrustedCertificate"
+  #            az keyvault secret download --file $(dockerCiTestsIntegrationPath)/certificate.pfx --vault-name SML-DEV-KeyVault --encoding base64 --name TestCertificate
+  #      # Run infra and execute integration tests
+  #      - script: |
+  #            cd $(dockerCiTestsIntegrationPath)
+  #            echo "docker-compose -f docker-compose.yml -f docker-compose.override.yml up --exit-code-from tests.integration.SML.ExampleGrpc.tests.integration"
+  #            docker-compose -f docker-compose.yml -f docker-compose.override.yml up --exit-code-from tests.integration.SML.ExampleGrpc.tests.integration
+  #        env:
+  #          TAG : tests-$(Build.BuildNumber)-id-$(Build.BuildId)
+  #          TEST_RESULTS_DIRECTORY : $(testResultsDirectory)
+  #        displayName: Run infra and execute integration tests
+  #      # Generate docker logs and display it
+  #      - script: |
+  #          mkdir -p $(outputTestsDockerizedStage)/logs/docker-compose
+  #          docker inspect $(docker ps -aq) >  $(outputTestsDockerizedStage)/logs/docker-compose/docker-inspect.txt
+  #          cat  $(outputTestsDockerizedStage)/logs/docker-compose/docker-inspect.txt
+  #        displayName: Generate docker container logs
+  #        condition: always()
+  #      - script : cp -R $(testResultsDirectory) $(outputTestsDockerizedStage)
+  #        condition: always()
+  #        displayName: Copy $(testResultsDirectory) to $(outputTestsDockerizedStage)
+  #      # Genrate IaC tests and .env
+  #      - script : |
+  #          cp -R $(dockerCiTestsIntegrationPath) $(outputTestsDockerizedStage)/IaC
+  #          echo "TAG=tests-$(Build.BuildNumber)-id-$(Build.BuildId)" >> $(outputTestsDockerizedStage)/IaC/.env
+  #        condition: always()
+  #        displayName: Copy IaC and generate .env
+  #      # Publis test resutls to Az-Do
+  #      - task: PublishTestResults@2
+  #        displayName: Publis test results
+  #        inputs:
+  #          testResultsFormat: VSTest
+  #          testResultsFiles: '$(testResultsDirectory)/*.trx'
+  #      # Archives and publish logs files
+  #      - task: ArchiveFiles@2
+  #        condition: always()
+  #        displayName: Archive files $(outputTestsDockerizedStage).zip
+  #        inputs:
+  #          rootFolderOrFile: $(outputTestsDockerizedStage)
+  #          archiveType: zip
+  #          includeRootFolder: false
+  #          archiveFile: $(outputTestsDockerizedStage).zip
+  #      - task: PublishPipelineArtifact@1
+  #        displayName: Publish pipeline artefact integration-tests-outputs
+  #        condition: always()
+  #        inputs:
+  #          targetPath: $(outputTestsDockerizedStage).zip
+  #          artifactName: integration-tests-outputs-$(logTime)
+  #
+  ## Stage : docker-commpose tests system lifecycle
+  ## # # # # # # # # # # # # # # # # # # # # # # #
+  #- stage: tests_system
+  #  displayName: Tests system
+  #  dependsOn: [ tests_integration]
+  #  jobs:
+  #    - job:
+  #      displayName : System tests
+  #      pool:
+  #          vmImage: $(vmImageubuntu)
+  #      steps:
+  #      - pwsh : echo "##vso[task.setvariable variable=logTime]$(date +"%H%M%S")"
+  #        displayName: setLogTime
+  #      # Install latest Docker Compose
+  #      - pwsh: |
+  #          sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+  #          sudo chmod +x /usr/local/bin/docker-compose
+  #          docker-compose --version
+  #        displayName: 'Install latest Docker Compose'
+  #      # docker login
+  #      - task: Docker@2
+  #        inputs:
+  #          containerRegistry: $(container-registry-ci)
+  #          command: 'login'
+  #      # Run retreave azure certificate from key vault
+  #      - task: AzureCLI@2
+  #        displayName: "Install Certificate"
+  #        inputs:
+  #          azureSubscription: 'Azure-DevOps'
+  #          scriptType: 'pscore'
+  #          scriptLocation: 'inlineScript'
+  #          addSpnToEnvironment: true
+  #          inlineScript: |
+  #            Set-PSDebug -Trace 1
+  #            $vaultName="SML-DEV-KeyVault"
+  #            $certName="systemTestsAutosignedTrustedCertificate"
+  #            az keyvault secret download --file $(dockerCiTestsSystemPath)/certificate.pfx --vault-name SML-DEV-KeyVault --encoding base64 --name TestCertificate
+  #      # Run infra and execute system tests
+  #      - script: |
+  #            cd $(dockerCiTestsSystemPath)
+  #            echo "docker-compose -f docker-compose.yml -f docker-compose.override.yml up --exit-code-from tests.system.SML.ExampleGrpc.tests.system"
+  #            docker-compose -f docker-compose.yml -f docker-compose.override.yml up --exit-code-from tests.system.SML.ExampleGrpc.tests.system
+  #        env:
+  #          TAG : tests-$(Build.BuildNumber)-id-$(Build.BuildId)
+  #          TEST_RESULTS_DIRECTORY : $(testResultsDirectory)
+  #        displayName: Run infra and execute system tests
+  #      # Generate docker logs and display it
+  #      - script: |
+  #          mkdir -p $(outputTestsDockerizedStage)/logs/docker-compose
+  #          docker inspect $(docker ps -aq) >  $(outputTestsDockerizedStage)/logs/docker-compose/docker-inspect.txt
+  #          cat  $(outputTestsDockerizedStage)/logs/docker-compose/docker-inspect.txt
+  #        displayName: Generate docker container logs
+  #        condition: always()
+  #      - script : cp -R $(testResultsDirectory) $(outputTestsDockerizedStage)
+  #        condition: always()
+  #        displayName: Copy $(testResultsDirectory) to $(outputTestsDockerizedStage)
+  #      # Genrate IaC tests and .env
+  #      - script : |
+  #          cp -R $(dockerCiTestsSystemPath) $(outputTestsDockerizedStage)/IaC
+  #          echo "TAG=tests-$(Build.BuildNumber)-id-$(Build.BuildId)" >> $(outputTestsDockerizedStage)/IaC/.env
+  #        condition: always()
+  #        displayName: Copy IaC and generate .env
+  #      # Publis test resutls to Az-Do
+  #      - task: PublishTestResults@2
+  #        displayName: Publis test results
+  #        inputs:
+  #          testResultsFormat: VSTest
+  #          testResultsFiles: '$(testResultsDirectory)/*.trx'
+  #      # Archives and publish logs files
+  #      - task: ArchiveFiles@2
+  #        condition: always()
+  #        displayName: Archive files $(outputTestsDockerizedStage).zip
+  #        inputs:
+  #          rootFolderOrFile: $(outputTestsDockerizedStage)
+  #          archiveType: zip
+  #          includeRootFolder: false
+  #          archiveFile: $(outputTestsDockerizedStage).zip
+  #      - task: PublishPipelineArtifact@1
+  #        displayName: Publish pipeline artefact integration-tests-outputs
+  #        condition: always()
+  #        inputs:
+  #          targetPath: $(outputTestsDockerizedStage).zip
+  #          artifactName: system-tests-outputs-$(logTime)
+  #
+  # Stage : Release feed
+  # # # # # # # # # # #
+- stage: feed_release
+  condition: and(eq(variables.needToRelease, 'true'), succeeded())
+  displayName: Feed Release
+  dependsOn: [linux_docker_build_lifecycles]
+  jobs:
+    # Job : Windows feed release
+    - job: Feed_windows_runtime_release
+      displayName: Windows runtime release on feed
+      pool:
+        vmImage: $(vmImageUbuntu)
+      steps:
+        # Download pipeline windows artifact
+        - task: DownloadPipelineArtifact@2
+          displayName: Download pipeline artefact $(artifactBaseName)-$(windowsRuntime)
+          inputs:
+            artifact: $(artifactBaseName)-$(windowsRuntime)
+            path: $(Build.ArtifactStagingDirectory)/$(artifactBaseName)-$(windowsRuntime)
+        - script: |
+            mv $(Build.ArtifactStagingDirectory)/$(artifactBaseName)-$(windowsRuntime)/$(artifactBaseName)-$(windowsRuntime).zip $(Build.ArtifactStagingDirectory)/$(artifactBaseName)-$(windowsRuntime)/$(feed-package-name)-$(windowsRuntime).zip
+          displayName: rename downloded artefact
+        # Release artifact
+        - task: UniversalPackages@0
+          displayName: UPack Publish Alpha
+          condition: and(eq(variables.needToRelease, 'true'), succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/develop'))
+          inputs:
+            command: publish
+            publishDirectory: $(Build.ArtifactStagingDirectory)/$(artifactBaseName)-$(windowsRuntime)
+            feedsToUsePublish: "internal"
+            vstsFeedPublish: SmartDevOps/Alpha
+            vstsFeedPackagePublish: $(feed-package-name)-$(windowsRuntime)
+            versionOption: custom
+            versionPublish: $(Build.BuildNumber)
+            packagePublishDescription: "$(project-name) for windows"
+        # Release artifact
+        - task: UniversalPackages@0
+          displayName: UPack Publish Beta
+          condition: and(eq(variables.needToRelease, 'true'), succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/qa'))
+          inputs:
+            command: publish
+            publishDirectory: $(Build.ArtifactStagingDirectory)/$(artifactBaseName)-$(windowsRuntime)
+            feedsToUsePublish: "internal"
+            vstsFeedPublish: SmartDevOps/Beta
+            vstsFeedPackagePublish: $(feed-package-name)-$(windowsRuntime)
+            versionOption: custom
+            versionPublish: $(Build.BuildNumber)
+            packagePublishDescription: "$(project-name) for windows"
+        # Release artifact
+        - task: UniversalPackages@0
+          displayName: UPack Publish Rc-Prod
+          condition: and(eq(variables.needToRelease, 'true'), succeeded(), or(eq(variables['Build.SourceBranch'], 'refs/heads/main'),eq(variables['Build.SourceBranch'], 'refs/heads/rc')))
+          inputs:
+            command: publish
+            publishDirectory: $(Build.ArtifactStagingDirectory)/$(artifactBaseName)-$(windowsRuntime)
+            feedsToUsePublish: "internal"
+            vstsFeedPublish: SmartDevOps/RC-Prod
+            vstsFeedPackagePublish: $(feed-package-name)-$(windowsRuntime)
+            versionOption: custom
+            versionPublish: $(Build.BuildNumber)
+            packagePublishDescription: "$(project-name) for windows"
+  ##  # Job : Linux feed release
+  ##  - job: Feed_linux_runtime_release
+  ##    displayName : Linux runtime release on Feed
+  ##    pool:
+  ##      vmImage: $(vmImageUbuntu)
+  ##    steps:
+  ##    # Download pipeline linux artifact
+  ##    - task: DownloadPipelineArtifact@2
+  ##      displayName: Download pipeline artefact $(artifactBaseName)-$(linuxRuntime)
+  ##      inputs:
+  ##        artifact: $(artifactBaseName)-$(linuxRuntime)
+  ##        path: $(Build.ArtifactStagingDirectory)/$(artifactBaseName)-$(linuxRuntime)
+  ##    # Release artifact
+  ##    - task: UniversalPackages@0
+  ##      displayName: UPack Publish Alpha
+  ##      condition: and(eq(variables.needToRelease, 'true'), succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/develop'))
+  ##      inputs:
+  ##        command: publish
+  ##        publishDirectory: $(Build.ArtifactStagingDirectory)/$(artifactBaseName)-$(linuxRuntime)
+  ##        feedsToUsePublish: 'internal'
+  ##        vstsFeedPublish: SmartDevOps/Alpha
+  ##        vstsFeedPackagePublish: $(feed-package-name)-$(linuxRuntime)
+  ##        versionOption: custom
+  ##        versionPublish: $(Build.BuildNumber)
+  ##        packagePublishDescription: '$(project-name) for linux'
+  ##    # Release artifact
+  ##    - task: UniversalPackages@0
+  ##      displayName: UPack Publish Beta
+  ##      condition: and(eq(variables.needToRelease, 'true'), succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/qa'))
+  ##      inputs:
+  ##        command: publish
+  ##        publishDirectory: $(Build.ArtifactStagingDirectory)/$(artifactBaseName)-$(linuxRuntime)
+  ##        feedsToUsePublish: 'internal'
+  ##        vstsFeedPublish: SmartDevOps/Beta
+  ##        vstsFeedPackagePublish: $(feed-package-name)-$(linuxRuntime)
+  ##        versionOption: custom
+  ##        versionPublish: $(Build.BuildNumber)
+  ##        packagePublishDescription: '$(project-name) for linux'
+  ##    # Release artifact
+  ##    - task: UniversalPackages@0
+  ##      displayName: UPack Publish Rc-Prod
+  ##      condition: and(eq(variables.needToRelease, 'true'), succeeded(), or(eq(variables['Build.SourceBranch'], 'refs/heads/main'),eq(variables['Build.SourceBranch'], 'refs/heads/rc')))
+  ##      inputs:
+  ##        command: publish
+  ##        publishDirectory: $(Build.ArtifactStagingDirectory)/$(artifactBaseName)-$(linuxRuntime)
+  ##        feedsToUsePublish: 'internal'
+  ##        vstsFeedPublish: SmartDevOps/RC-Prod
+  ##        vstsFeedPackagePublish: $(feed-package-name)-$(linuxRuntime)
+  ##        versionOption: custom
+  ##        versionPublish: $(Build.BuildNumber)
+  ##        packagePublishDescription: '$(project-name) for linux'
+  # Stage : Docker Registry Promotion
+  # # # # # # # # # # # # # # # # #
+- stage: promote_image
+  condition: and(eq(variables.needToRelease, 'true'), succeeded())
+  displayName: promote docker image latest
+  dependsOn: [linux_docker_build_lifecycles]
+  jobs:
+    - job:
+      displayName: promote docker image
+      pool:
+        vmImage: $(vmImageUbuntu)
+      steps:
+        - task: Docker@2
+          displayName: Docker login
+          inputs:
+            containerRegistry: $(container-registry-ci)
+            command: login
+        # docker promote
+        - script: |
+            docker pull $(container-registry-ci-full-name)/$(imageRepository):tests-$(Build.BuildNumber)-id-$(Build.BuildId)
+            docker tag $(container-registry-ci-full-name)/$(imageRepository):tests-$(Build.BuildNumber)-id-$(Build.BuildId) $(container-registry-full-name)/$(imageRepository):$(Build.BuildNumber)
+          displayName: Promote image
+        - script: docker tag $(container-registry-ci-full-name)/$(imageRepository):tests-$(Build.BuildNumber)-id-$(Build.BuildId) $(container-registry-full-name)/$(imageRepository):latest
+          condition: and(eq(variables.isADockerLatestImage, 'true'), succeeded())
+          displayName: Promote image latest
+        # Docker push
+        - task: Docker@2
+          displayName: Docker push
+          inputs:
+            containerRegistry: $(container-registry)
+            repository: $(imageRepository)
+            command: "push"
+            tags: |
+              $(Build.BuildNumber)

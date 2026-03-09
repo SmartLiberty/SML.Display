@@ -1,0 +1,22 @@
+version: '3.9'
+
+services:
+
+  tests.integration.sml.examplegrpc.tests.integration:
+    image: sml-examplegrpc-tests-integration
+    build:
+      context: .
+      dockerfile: SML.ExampleGrpc.Tests.Integration\Dockerfile
+      args:
+        PAT: ${PAT}
+    depends_on: 
+      tests.integration.message.brocker:
+        condition: service_healthy
+
+  tests.integration.message.brocker:
+    image: rabbitmq:${MESSAGE_BROCKER_TAG:-3.8.10-management-alpine}
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 30s
+      timeout: 30s
+      retries: 3

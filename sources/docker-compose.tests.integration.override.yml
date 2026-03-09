@@ -1,0 +1,10 @@
+version: '3.9'
+services:
+  tests.integration.sml.examplegrpc.tests.integration:
+    environment:
+      Install__Data: "./"
+      RabbitMqSettings__HostName: "tests.integration.message.brocker"
+      RabbitMqSettings__Port: "5672"
+  tests.integration.message.brocker:
+    ports:
+      - ${MESSAGE_BROCKER_PORT:-55672}:5672

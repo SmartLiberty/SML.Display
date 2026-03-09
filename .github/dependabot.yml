@@ -1,0 +1,15 @@
+version: 2
+registries:
+  azure-devops-feed:
+    type: nuget-feed
+    url: https://pkgs.dev.azure.com/SmartDevQA/SmartDevOps/_packaging/SmartNuget/nuget/v3/index.json
+    token: ${{secrets.AZURE_DEVOPS_PAT}}
+updates:
+  - package-ecosystem: "nuget"
+    directory: "/"  # Location of nuget.config file
+    target-branch: "main"
+    schedule:
+      interval: "weekly"  # Dependabot verify updates every week
+      day: "sunday"
+    registries:
+      - azure-devops-feed
