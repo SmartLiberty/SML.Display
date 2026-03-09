@@ -22,7 +22,7 @@ public static class GrpcClientConfigurationExtensions
         services.AddTransient<CorrelationRpcClientInterceptor>();
 
 
-        services.AddGrpcClient<Examples.ExamplesClient>(exampleGrpcClientSettings, allowInvalidCertificate);
+        //services.AddGrpcClient<Examples.ExamplesClient>(exampleGrpcClientSettings, allowInvalidCertificate);
         
         return services;
     }

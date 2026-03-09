@@ -2,7 +2,7 @@ namespace SML.Display.StartupConfiguration;
 
 using Calzolari.Grpc.AspNetCore.Validation;
 using Core.Main;
-using Core.Validators;
+//using Core.Validators;
 using FluentValidation;
 using Middleware.Interceptors;
 using Scrutor;
@@ -36,16 +36,16 @@ public static class GrpcServiceConfigurationExtensions
 
     public static void MapGrpcServices(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapGrpcService<GrpcExamplesServices>();
+        //endpoints.MapGrpcService<GrpcExamplesServices>();
     }
 
     private static IServiceCollection AddGrpcValidators(this IServiceCollection serviceCollection)
     {
-        serviceCollection.Scan(scan =>
-            scan.FromAssemblyOf<GrpcUpdateRequestValidator>()
-                .AddClasses(classes => classes.AssignableTo(typeof(AbstractValidator<>)))
-                .UsingRegistrationStrategy(RegistrationStrategy.Skip)
-                .AsImplementedInterfaces());
+        //serviceCollection.Scan(scan =>
+        //    scan.FromAssemblyOf<GrpcUpdateRequestValidator>()
+        //        .AddClasses(classes => classes.AssignableTo(typeof(AbstractValidator<>)))
+        //        .UsingRegistrationStrategy(RegistrationStrategy.Skip)
+        //        .AsImplementedInterfaces());
 
         return serviceCollection;
     }

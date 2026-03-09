@@ -27,7 +27,6 @@ public static class IoCConfigurationExtensions
         services.AddSingleton<IWatchdogClientService, WatchdogClientService>();
 
         services.AddSingleton<IMainController, MainController>();
-		services.AddSingleton<IDataHandler, DataHandler>();
 		services.AddSingleton(TimeProvider.System);
 
 		Assembly assembly = Assembly.GetExecutingAssembly();

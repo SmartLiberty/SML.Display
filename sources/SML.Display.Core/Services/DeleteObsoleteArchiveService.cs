@@ -26,7 +26,7 @@ public class DeleteObsoleteArchiveService : IDeleteObsoleteArchiveService
     
     public async Task DeleteObsoleteArchive()
     {
-        var examples = _dbContext.Examples
+        var examples = _dbContext.VisitConfigs
             .Where(x => x.Archived && x.LastUpdated < _timeProvider.GetUtcNow() - _lifeTimeSettings.ArchivedExamplesSpan)
             .ToList();
         
@@ -34,7 +34,7 @@ public class DeleteObsoleteArchiveService : IDeleteObsoleteArchiveService
         
         if (examples.Count > 0)
         {
-            _dbContext.Examples.RemoveRange(examples);
+            _dbContext.VisitConfigs.RemoveRange(examples);
             await _dbContext.SaveChangesAsync();
             _logger.LogInformation("{DeletedExamplesCount} archived examples have been deleted", examples.Count);
         }

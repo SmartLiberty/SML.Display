@@ -73,7 +73,7 @@ public class RabbitMqChannelFactoryTest
         Assert.IsNotNull(channel);
         _mockConnectionFactory.Verify(x => x.CreateConnection(), Times.Once);
         _mockConnection.Verify(x => x.CreateModel(), Times.Once);
-        Assert.AreEqual(1, _mockChannels.Count);
+        Assert.HasCount(1, _mockChannels);
         var mockChannel = _mockChannels.First();
         Assert.AreEqual(mockChannel.Object, channel);
         _mockConnection.VerifyGet(x => x.IsOpen, Times.Never);
@@ -95,7 +95,7 @@ public class RabbitMqChannelFactoryTest
         Assert.IsNotNull(secondChannel);
         _mockConnectionFactory.Verify(x => x.CreateConnection(), Times.Once);
         _mockConnection.Verify(x => x.CreateModel(), Times.Exactly(2));
-        Assert.AreEqual(2, _mockChannels.Count);
+        Assert.HasCount(2, _mockChannels);
         var mockFirstChannel = _mockChannels.First();
         Assert.AreEqual(mockFirstChannel.Object, firstChannel);
         var mockSecondChannel = _mockChannels.Last();
@@ -128,7 +128,7 @@ public class RabbitMqChannelFactoryTest
         Assert.IsNotNull(channel);
         _mockConnectionFactory.Verify(x => x.CreateConnection(), Times.Exactly(3));
         _mockConnection.Verify(x => x.CreateModel(), Times.Once);
-        Assert.AreEqual(1, _mockChannels.Count);
+        Assert.HasCount(1, _mockChannels);
         var mockChannel = _mockChannels.First();
         Assert.AreEqual(mockChannel.Object, channel);
         _mockConnection.VerifyGet(x => x.IsOpen, Times.Never);
@@ -158,7 +158,7 @@ public class RabbitMqChannelFactoryTest
         Assert.IsNotNull(channel);
         _mockConnectionFactory.Verify(x => x.CreateConnection(), Times.Exactly(3));
         _mockConnection.Verify(x => x.CreateModel(), Times.Once);
-        Assert.AreEqual(1, _mockChannels.Count);
+        Assert.HasCount(1, _mockChannels);
         var mockChannel = _mockChannels.First();
         Assert.AreEqual(mockChannel.Object, channel);
         _mockConnection.VerifyGet(x => x.IsOpen, Times.Never);
@@ -214,7 +214,7 @@ public class RabbitMqChannelFactoryTest
         Assert.IsNotNull(channel);
         _mockConnectionFactory.Verify(x => x.CreateConnection(), Times.Once);
         _mockConnection.Verify(x => x.CreateModel(), Times.Exactly(3));
-        Assert.AreEqual(1, _mockChannels.Count);
+        Assert.HasCount(1, _mockChannels);
         var mockChannel = _mockChannels.First();
         Assert.AreEqual(mockChannel.Object, channel);
         _mockConnection.VerifyGet(x => x.IsOpen, Times.Never);
@@ -246,7 +246,7 @@ public class RabbitMqChannelFactoryTest
         Assert.IsNotNull(channel);
         _mockConnectionFactory.Verify(x => x.CreateConnection(), Times.Once);
         _mockConnection.Verify(x => x.CreateModel(), Times.Exactly(3));
-        Assert.AreEqual(1, _mockChannels.Count);
+        Assert.HasCount(1, _mockChannels);
         var mockChannel = _mockChannels.First();
         Assert.AreEqual(mockChannel.Object, channel);
         _mockConnection.VerifyGet(x => x.IsOpen, Times.Never);
@@ -328,7 +328,7 @@ public class RabbitMqChannelFactoryTest
         }
         catch (AggregateException e)
         {
-            Assert.AreEqual(1, e.InnerExceptions.Count);
+            Assert.HasCount(1, e.InnerExceptions);
             Assert.AreEqual("A task was canceled.", e.InnerExceptions.First().Message);
         }
         _mockConnectionFactory.Verify(x => x.CreateConnection(), Times.Once);
@@ -478,7 +478,7 @@ public class RabbitMqChannelFactoryTest
         }
         catch (AggregateException e)
         {
-            Assert.AreEqual(1, e.InnerExceptions.Count);
+            Assert.HasCount(1, e.InnerExceptions);
             Assert.AreEqual("The operation was canceled.", e.InnerExceptions.First().Message);
         }
         _mockConnection.Verify(x => x.Close(), Times.Once);

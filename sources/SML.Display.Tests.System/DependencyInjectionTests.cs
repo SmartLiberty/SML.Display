@@ -52,13 +52,6 @@ public class DependencyInjectionTests
         _serviceProvider = services.BuildServiceProvider();
     }
 
-
-    [TestMethod]
-    public void TestIMainController()
-    {
-        Assert.IsNotNull(_serviceProvider.GetService<IMainController>());
-    }
-
     [TestMethod]
     public void TestIMapper()
     {

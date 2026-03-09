@@ -10,6 +10,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
+using SML.Display.Shared.Proto;
 using System;
 using Utils;
 
@@ -33,13 +34,13 @@ public class DeleteObsoleteArchiveServiceTest
         var builder = CreateBuilder(nameof(TestContext.TestName));
         using var dbContext = new DatabaseContext(builder.Options);
 
-        dbContext.Examples.Add(new Example
+        dbContext.VisitConfigs.Add(new VisitConfig
         {
             DisplayName = "Archived and not in time span",
             Archived = true
         });
 
-        dbContext.Examples.Add(new Example
+        dbContext.VisitConfigs.Add(new VisitConfig
         {
             DisplayName = "Not Archived and in not in time span",
             Archived = false
@@ -50,13 +51,13 @@ public class DeleteObsoleteArchiveServiceTest
 
         _fakeTimeProvider.Advance(TimeSpan.FromDays(20));
 
-        dbContext.Examples.Add(new Example
+        dbContext.VisitConfigs.Add(new VisitConfig
         {
             DisplayName = "Archived and in time span",
             Archived = true
         });
 
-        dbContext.Examples.Add(new Example
+        dbContext.VisitConfigs.Add(new VisitConfig
         {
             DisplayName = "Not Archived and in time span",
             Archived = false
@@ -77,7 +78,7 @@ public class DeleteObsoleteArchiveServiceTest
         await obsoleteArchiveCleaner.DeleteObsoleteArchive();
 
         //Assert
-        Assert.AreEqual(3, dbContext.Examples.Count());
+        Assert.AreEqual(3, dbContext.VisitConfigs.Count());
     }
 
     private DbContextOptionsBuilder<DatabaseContext> CreateBuilder(string methodName)

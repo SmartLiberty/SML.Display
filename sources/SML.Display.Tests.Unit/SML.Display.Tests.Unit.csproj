@@ -25,4 +25,9 @@
     <ProjectReference Include="..\SML.Display.Core\SML.Display.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Main\" />
+    <Folder Include="Validators\" />
+  </ItemGroup>
+
 </Project>

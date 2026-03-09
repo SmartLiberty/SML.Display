@@ -22,16 +22,16 @@
     <PackageReference Include="Serilog" Version="4.3.0" />
     <PackageReference Include="SML.Backup.Shared.Events" Version="1.0.3" />
     <PackageReference Include="SML.Example.Shared.Dtos" Version="1.0.3" />
-    <PackageReference Include="SML.Display.Shared.Proto" Version="1.0.4" />
+    <PackageReference Include="SML.Display.Shared.Proto" Version="1.0.0-ama.1" />
     <PackageReference Include="SML.Shared.Exception" Version="1.0.10" />
     <PackageReference Include="SML.Shared.RabbitMq.Rpc" Version="1.0.1" />
     <PackageReference Include="SML.VersionInfos.Events" Version="1.0.1" />
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Data\Enums\" />
     <Folder Include="Data\Models\" />
     <Folder Include="Migrations" />
+    <Folder Include="Validators\" />
   </ItemGroup>
 
 </Project>

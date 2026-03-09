@@ -12,7 +12,8 @@ public class DatabaseContext : DbContext
 {
     private readonly TimeProvider _timeProvider;
 
-    public DbSet<Example> Examples { get; set; } = null!;
+    public DbSet<VisitConfig> VisitConfigs { get; set; } = null!;
+
 
     public DatabaseContext(DbContextOptions<DatabaseContext> options)
         : base(options)
@@ -23,7 +24,7 @@ public class DatabaseContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.UseIdentityColumns();
-        modelBuilder.ApplyConfiguration(new ExamplesConfiguration());
+        modelBuilder.ApplyConfiguration(new VisistConfigConfiguration());
     }
     
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
