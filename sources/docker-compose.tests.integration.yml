@@ -2,11 +2,11 @@ version: '3.9'
 
 services:
 
-  tests.integration.sml.examplegrpc.tests.integration:
-    image: sml-examplegrpc-tests-integration
+  tests.integration.sml.display.tests.integration:
+    image: sml-display-tests-integration
     build:
       context: .
-      dockerfile: SML.ExampleGrpc.Tests.Integration\Dockerfile
+      dockerfile: SML.Display.Tests.Integration\Dockerfile
       args:
         PAT: ${PAT}
     depends_on: 

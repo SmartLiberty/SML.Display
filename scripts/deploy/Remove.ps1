@@ -2,7 +2,7 @@
 # REMOVE                                                                           |
 # ---------------------------------------------------------------------------------/
 
-[string] $serviceName = "SML.ExampleGrpc"
+[string] $serviceName = "SML.Display"
 [string] $databaseName = $serviceName
 
 # Time

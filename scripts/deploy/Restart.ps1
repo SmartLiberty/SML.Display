@@ -2,7 +2,7 @@
 # RESTART                                                                          |
 # ---------------------------------------------------------------------------------/
 
-[string] $serviceName = "SML.ExampleGrpc"
+[string] $serviceName = "SML.Display"
 
 # Time
 [double] $timeout = 25 * 1000 # [milliseconds]

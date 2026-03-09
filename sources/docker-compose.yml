@@ -1,30 +1,30 @@
 version: "3.9"
 services:
-  sml.examplegrpc:
-    image: sml-examplegrpc
+  sml.display:
+    image: sml-display
     build: 
       context: .
-      dockerfile: SML.ExampleGrpc\Dockerfile
+      dockerfile: SML.Display\Dockerfile
       args:
         PAT: ${PAT}
     healthcheck:
-      test: /bin/grpc_health_probe -service healtz -addr=sml.examplegrpc:${SML_EXAMPLEGRPC_PORT:-8080} 
+      test: /bin/grpc_health_probe -service healtz -addr=sml.display:${SML_EXAMPLEGRPC_PORT:-8080} 
       interval: 30s
       timeout : 30s
       retries: 5
     depends_on:
-      sml.examplegrpc.db:
+      sml.display.db:
         condition: service_healthy
-      sml.examplegrpc.message.brocker:
+      sml.display.message.brocker:
         condition: service_healthy
-  sml.examplegrpc.db:
+  sml.display.db:
     image: postgres:${DB_TAG:-14.4}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready"]
       interval: 10s
       timeout: 5s
       retries: 5
-  sml.examplegrpc.message.brocker:
+  sml.display.message.brocker:
     image: rabbitmq:${MESSAGE_BROCKER_TAG:-3.8.10-management-alpine}
     healthcheck:
       test: rabbitmq-diagnostics -q ping

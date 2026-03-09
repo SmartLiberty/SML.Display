@@ -1,26 +1,26 @@
 version: "3.9"
 services:
-  sml.examplegrpc:
+  sml.display:
     environment:
-      ConnectionStrings__DbContext: "Host=sml.examplegrpc.db; Port=5432; Database='${DB_DATABASE_NAME:-SML.ExampleGrpc}'; Username='${DB_USERNAME:-postgres}'; Password='${DB_PASSWORD:-postgresPWD}'"
+      ConnectionStrings__DbContext: "Host=sml.display.db; Port=5432; Database='${DB_DATABASE_NAME:-SML.Display}'; Username='${DB_USERNAME:-postgres}'; Password='${DB_PASSWORD:-postgresPWD}'"
       Install__Data: "./"
-      Kestrel__EndPoints__Http__Url: "http://sml.examplegrpc:${SML_EXAMPLEGRPC_PORT:-8080}"
+      Kestrel__EndPoints__Http__Url: "http://sml.display:${SML_EXAMPLEGRPC_PORT:-8080}"
       Logging__LogLevel__Default : "Debug"
-      RabbitMqSettings__HostName: "sml.examplegrpc.message.brocker"
+      RabbitMqSettings__HostName: "sml.display.message.brocker"
       RabbitMqSettings__Port: "5672"
       ASPNETCORE_ENVIRONMENT: "Development"
     ports:
       - ${SML_EXAMPLEGRPC_DOCKER_HOST_PORT:-8080}:${SML_EXAMPLEGRPC_PORT:-8080}
 
-  sml.examplegrpc.db:
+  sml.display.db:
     environment:
       POSTGRES_PASSWORD: ${DB_PASSWORD:-postgresPWD}
       POSTGRES_USER: ${DB_USERNAME:-postgres}
-      POSTGRES_DB: ${DB_DATABASE_NAME:-SML.ExampleGrpc}
+      POSTGRES_DB: ${DB_DATABASE_NAME:-SML.Display}
     ports:
       - "${DB_CONTAINER_DOCKER_HOST_PORT:-55432}:5432"
 
-  sml.examplegrpc.message.brocker:
+  sml.display.message.brocker:
     image: rabbitmq:3.8.10-management-alpine
     ports:
       - ${MESSAGE_BROCKER_PORT:-55672}:5672

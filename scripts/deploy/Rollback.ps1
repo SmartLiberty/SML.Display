@@ -1,6 +1,6 @@
 param($exeBackupZipFile = "", $dbBackupFile="")
 
-$serviceName = "SML.ExampleGrpc"
+$serviceName = "SML.Display"
 
 # Check that PowerShell 64-bits is used
 $intSize = [intptr]::size

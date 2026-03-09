@@ -1,0 +1,24 @@
+{
+  "profiles": {
+    "SML.Display": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
+    "SML.Display --Database-Update": {
+      "commandName": "Project",
+      "commandLineArgs": "--Database-Update",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
+    "SML.Display --No-Database-Update": {
+      "commandName": "Project",
+      "commandLineArgs": "--No-Database-Update",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}

@@ -46,20 +46,20 @@ variables:
   - name: powershell-directory
     value: $(Build.SourcesDirectory)/scripts/ci-cd/powershell
   - name: powershell-directory-sml-service
-    value: $(Build.SourcesDirectory)/SML.ExampleGrpc/scripts/ci-cd/powershell
+    value: $(Build.SourcesDirectory)/SML.Display/scripts/ci-cd/powershell
   - name: sln-directory
-    value: $(Build.SourcesDirectory)/SML.ExampleGrpc/sources
+    value: $(Build.SourcesDirectory)/SML.Display/sources
   - name: project-directory
     value: $(sln-directory)/$(project-name)
   - name : service-deploy-directory
-    value: $(Build.SourcesDirectory)/SML.ExampleGrpc/scripts
+    value: $(Build.SourcesDirectory)/SML.Display/scripts
   # Dotnet Life Cycle
   - name: dotnetcore
     value: 8.0.x
   - name: build-configuration
     value: Release
   - name: project-name
-    value: SML.ExampleGrpc
+    value: SML.Display
   - name: packageName
     value: $(project-name)-$(Build.BuildNumber)
   - name: artifactBaseName
@@ -87,7 +87,7 @@ variables:
   - name: dockerCiBuildPath
     value: $(Build.SourcesDirectory)/docker/ci-docker-build
   - name: imageRepository
-    value: sml-examplegrpc
+    value: sml-display
   #    - name: imageRepositoryTestsSystem
   #      value: $(imageRepository)-tests-system
   #    - name: imageRepositoryTestsIntegration
@@ -111,13 +111,13 @@ variables:
   # # # #SharePoint variables
   # Feed releases
   - name: feed-package-name
-    value: sml-examplegrpc
+    value: sml-display
 
 resources:
   repositories:
-    - repository: SML.ExampleGrpc
+    - repository: SML.Display
       type: github
-      name: SmartLiberty/SML.ExampleGrpc
+      name: SmartLiberty/SML.Display
       endpoint: SmartDevOps
       ref: $(Build.SourceBranch)
     - repository: Tool.DeploymentModule
@@ -186,7 +186,7 @@ stages:
       # Steps : .Net Life Cycle
       #########################
       steps:
-      - checkout: SML.ExampleGrpc
+      - checkout: SML.Display
       - task: UseDotNet@2
         displayName: Dotnet Install .NET Core sdk $(dotnetcore)
         inputs:
@@ -263,7 +263,7 @@ stages:
           TargetFolder: $(Build.ArtifactStagingDirectory)/$(artifactBaseName)-$(windowsRuntime)
           Contents: 'DeploymentModule.psm1'
         displayName: "Get file from Tool.DeploymentModule"
-      - checkout: SML.ExampleGrpc
+      - checkout: SML.Display
       # Archive all
       - task: ArchiveFiles@2
         inputs:
@@ -587,8 +587,8 @@ stages:
   #      # Run infra and execute integration tests
   #      - script: |
   #            cd $(dockerCiTestsIntegrationPath)
-  #            echo "docker-compose -f docker-compose.yml -f docker-compose.override.yml up --exit-code-from tests.integration.SML.ExampleGrpc.tests.integration"
-  #            docker-compose -f docker-compose.yml -f docker-compose.override.yml up --exit-code-from tests.integration.SML.ExampleGrpc.tests.integration
+  #            echo "docker-compose -f docker-compose.yml -f docker-compose.override.yml up --exit-code-from tests.integration.SML.Display.tests.integration"
+  #            docker-compose -f docker-compose.yml -f docker-compose.override.yml up --exit-code-from tests.integration.SML.Display.tests.integration
   #        env:
   #          TAG : tests-$(Build.BuildNumber)-id-$(Build.BuildId)
   #          TEST_RESULTS_DIRECTORY : $(testResultsDirectory)
@@ -671,8 +671,8 @@ stages:
   #      # Run infra and execute system tests
   #      - script: |
   #            cd $(dockerCiTestsSystemPath)
-  #            echo "docker-compose -f docker-compose.yml -f docker-compose.override.yml up --exit-code-from tests.system.SML.ExampleGrpc.tests.system"
-  #            docker-compose -f docker-compose.yml -f docker-compose.override.yml up --exit-code-from tests.system.SML.ExampleGrpc.tests.system
+  #            echo "docker-compose -f docker-compose.yml -f docker-compose.override.yml up --exit-code-from tests.system.SML.Display.tests.system"
+  #            docker-compose -f docker-compose.yml -f docker-compose.override.yml up --exit-code-from tests.system.SML.Display.tests.system
   #        env:
   #          TAG : tests-$(Build.BuildNumber)-id-$(Build.BuildId)
   #          TEST_RESULTS_DIRECTORY : $(testResultsDirectory)
