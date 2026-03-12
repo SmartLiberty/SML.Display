@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <RuntimeIdentifiers>win-x64;linux-x64</RuntimeIdentifiers>
-    <Version>1.0.0</Version>
+    <Version>1.0.1</Version>
     <Description>This is just an example for SML.Display. It should be replaced when the service is finished (don't forget appsettings)</Description>
     <Authors>SmartLiberty</Authors>
     <Nullable>enable</Nullable>
@@ -51,3 +51,6 @@
     </Content>
   </ItemGroup>
 </Project>
+
+
+

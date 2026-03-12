@@ -1,16 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
-
   <ItemGroup>
     <PackageReference Include="AutoMapper" Version="16.0.0" />
     <PackageReference Include="Calzolari.Grpc.AspNetCore.Validation" Version="9.0.0" />
     <PackageReference Include="EFCore.NamingConventions" Version="10.0.0-rc.2" />
-    <PackageReference Include="MessagePack" Version="2.5.187" />
+    <PackageReference Include="MessagePack" Version="2.5.198" />
     <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="10.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0">
       <PrivateAssets>all</PrivateAssets>
@@ -27,11 +25,9 @@
     <PackageReference Include="SML.Shared.RabbitMq.Rpc" Version="1.0.1" />
     <PackageReference Include="SML.VersionInfos.Events" Version="1.0.1" />
   </ItemGroup>
-
   <ItemGroup>
     <Folder Include="Data\Models\" />
     <Folder Include="Migrations" />
     <Folder Include="Validators\" />
   </ItemGroup>
-
 </Project>
